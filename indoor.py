@@ -71,7 +71,7 @@ capacity = 512
 img_w = 208
 img_h = 208
 
-test_dir = "C://Users//KG//Desktop//MMAI 894//Project//Images//"
+test_dir = "C://Users//Kevin//Desktop//MMAI_894//Images//"
 image_list, label_list = get_file(test_dir)
 image_batch, label_batch = get_batch(image_list,label_list, img_w,img_h, batch_size, capacity)
 
@@ -106,6 +106,8 @@ with tf.Session() as sess:
 images = []
 temp = []
 labels = []
+label_recorder =[]
+
 
 for root, sub_folders, files in os.walk(test_dir):
     for name in files:
@@ -116,7 +118,7 @@ for root, sub_folders, files in os.walk(test_dir):
         #print(os.path.join(root, name))
     for name in sub_folders:
         temp.append(os.path.join(root,name))
-        
+        label_recorder=np.append(label_recorder,name.split('/')[-1])
         
         #print(os.path.join(root, name))
         #print(name.split('/')[-1])
