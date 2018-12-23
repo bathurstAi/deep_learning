@@ -9,6 +9,7 @@ def get_file(file_dir):
     images = []
     temp = []
     labels = []
+    label_recorder =[]
 
     for root, sub_folders, files in os.walk(test_dir):
         for name in files:
@@ -19,9 +20,25 @@ def get_file(file_dir):
             #print(os.path.join(root, name))
         for name in sub_folders:
             temp.append(os.path.join(root,name))
-            
+            label_recorder=np.append(label_recorder,name.split('/')[-1])
+    ############ Lets create a dictionary list with label:int ################
+    count = 0
+    label_dic = dict()
+    for i in label_recorder:
+        #print(i)
+        label_dic[i]=count
+        count +=1  
+    ############ Lets change all the label to numeric based on dictionary ################
+    labels_copy = np.array(labels)#copy a label version for testing purpose
+
+    count = 0
+    for i in labels_copy:
+        #print(i)
+        labels_copy[count] = label_dic[i]
+        count+=1
+
     #combine images + labels
-    temp = np.array([images,labels])
+    temp = np.array([images,labels_copy])
     temp = temp.transpose()
     np.random.shuffle(temp) #randomize the images lists
 
@@ -50,7 +67,6 @@ def get_batch(image, label, image_W, image_H, batch_size, capacity):
 
     #make input queue
     input_queue = tf.train.slice_input_producer([image,label])
-
     label=input_queue[1]
     image_content = tf.read_file(input_queue[0])
     image = tf.image.decode_jpeg(image_content, channels = 3)
@@ -103,45 +119,81 @@ with tf.Session() as sess:
 # ######################################################### CODE FOR TESTING ######################
 
 ########################## Testing space for file name and path ######################
-images = []
-temp = []
-labels = []
-label_recorder =[]
+# images = []
+# temp = []
+# labels = []
+# label_recorder =[]
 
 
-for root, sub_folders, files in os.walk(test_dir):
-    for name in files:
-        images.append(os.path.join(root,name)) #get image path
-        label_name = root.split('/')[-1]  #split and find label name
-        labels = np.append(labels, label_name) #append label name to a list
-        label_name = ""
-        #print(os.path.join(root, name))
-    for name in sub_folders:
-        temp.append(os.path.join(root,name))
-        label_recorder=np.append(label_recorder,name.split('/')[-1])
+# for root, sub_folders, files in os.walk(test_dir):
+#     for name in files:
+#         images.append(os.path.join(root,name)) #get image path
+#         label_name = root.split('/')[-1]  #split and find label name
+#         labels = np.append(labels, label_name) #append label name to a list
+#         label_name = ""
+#         #print(os.path.join(root, name))
+#     for name in sub_folders:
+#         temp.append(os.path.join(root,name))
+#         label_recorder=np.append(label_recorder,name.split('/')[-1])
         
-        #print(os.path.join(root, name))
-        #print(name.split('/')[-1])
+#         #print(os.path.join(root, name))
+#         #print(name.split('/')[-1])
 
-temp = np.array([images,labels])
-temp = temp.transpose()
-#np.random.shuffle(temp) #randomize the images lists
+# count = 0
+# label_dic = dict()
+# for i in label_recorder:
+#     #print(i)
+#     label_dic[i]=count
+#     count +=1
 
-image_list = list(temp[:,0])
-label_list = list(temp[:,1])
+# labels_copy = np.array(labels)#copy a label version for testing purpose
+
+# count = 0
+# for i in labels_copy:
+#     #print(i)
+#     labels_copy[count] = label_dic[i]
+#     count+=1
+    
+
+# temp = np.array([images,labels_copy])
+# temp = temp.transpose()
+# #np.random.shuffle(temp) #randomize the images lists
+
+# image_list = list(temp[:,0])
+# label_list = list(temp[:,1])
 
 
-# ########################## Testing space for batch ######################
-# image = tf.cast(image_list, tf.string)
-# label = tf.cast(label_list, tf.int32)
+########################## Testing space for batch ######################
+batch_size = 2
+capacity = 512
+img_w = 208
+img_h = 208
 
-# #make input queue
-# input_queue = tf.train.slice_input_producer([image,label])
 
-# label=input_queue[1]
-# image_content = tf.read_file(input_queue[0])
-# image = tf.image.decode_jpeg(image_content, channels=3)
-# image = tf.image.resize_image_with_crop_or_pad(image, img_w, img_h)
-# image = tf.image.per_image_standardization(image)
-# image_batch, label_batch = tf.train.batch([image,label], batch_size = batch_size, num_threads = 64, capacity = capacity)
-# label_batch = tf.reshape(label_batch,[batch_size])
+image = tf.cast(image_list, tf.string)
+label = tf.cast(label_list, tf.int32)
+
+#make input queue
+input_queue = tf.train.slice_input_producer([image,label])
+
+label=input_queue[1]
+image_content = tf.read_file(input_queue[0])
+image = tf.image.decode_jpeg(image_content, channels=3)
+image = tf.image.resize_image_with_crop_or_pad(image, img_w, img_h)
+image = tf.image.per_image_standardization(image)
+image_batch, label_batch = tf.train.batch([image,label], batch_size = batch_size, num_threads = 64, capacity = capacity)
+#tf.data.Dataset.batch([image,label],batch_size = batch_size)
+label_batch = tf.reshape(label_batch,[batch_size])
+
+###########test
+init = tf.initialize_all_variables()
+sess = tf.Session()
+sess.run(init)
+im = sess.run(image_batch)
+
+fig = plt.figure()
+fig.add_subplot(1,2,1)
+plt.imshow(im)
+fig.add_subplot(1,2,2)
+plt.imshow(img)
+plt.show()
