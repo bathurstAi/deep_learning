@@ -1,4 +1,5 @@
 import tensorflow as tf 
+
 import numpy as np 
 import os
 import matplotlib.pyplot as plt 
@@ -49,7 +50,7 @@ def get_file(file_dir):
     return image_list, label_list
 
 
-
+################ in the processing of fixing #########################################33
 def get_batch(image, label, image_W, image_H, batch_size, capacity):
     #input:
         #image : list type
@@ -75,6 +76,7 @@ def get_batch(image, label, image_W, image_H, batch_size, capacity):
 
     image = tf.image.resize_image_with_crop_or_pad(image, image_W, image_H)
     image = tf.image.per_image_standardization(image)
+    
     image_batch, label_batch = tf.train.batch([image,label], batch_size = batch_size, num_threads = 64, capacity = capacity)
 
     label_batch = tf.reshape(label_batch,[batch_size])
@@ -92,12 +94,12 @@ image_list, label_list = get_file(test_dir)
 image_batch, label_batch = get_batch(image_list,label_list, img_w,img_h, batch_size, capacity)
 
 with tf.Session() as sess:
-    i = 0
+
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord = coord)
 
     try:
-        while not coord.should_stop() and i<1:
+        while not coord.should_stop():
             img, label = sess.run([image_batch,label_batch])
 
             for j in np.array(batch_size):
@@ -193,32 +195,72 @@ with tf.Session() as sess:
 # threads = tf.train.start_queue_runners(coord=coord)
 
 # ####################################################
-# image_list_a = image_list[5]
-# label_list_a = label_list[5]
+image_list_a = image_list[0:5]
+label_list_a = label_list[0:5]
 
-# sess = tf.InteractiveSession()
+#image = tf.cast(image_list_a, tf.string)
+#label = tf.cast(label_list_a, tf.int32)
+#make input queue
+# input_queue = tf.train.slice_input_producer([image,label]) #function will be removed soon
+input_queue  = tf.data.Dataset.from_tensor_slices((image_list_a,label_list_a)) #new function replace slice_input_producer
 
-# image = tf.cast(image_list_a, tf.string)
-# label = tf.cast(label_list_a, tf.int32)
-# #make input queue
-# image_content = tf.read_file(image)
-# image = tf.image.decode_jpeg(image_content, channels=3)
-# image = tf.image.resize_image_with_crop_or_pad(image, img_w, img_h)
-# image = tf.image.per_image_standardization(image)
-# image_batch, label_batch = tf.train.batch([image,label], batch_size = 1, num_threads = 64, capacity = capacity)
+# create TensorFlow Iterator object
+iterator = tf.data.Iterator.from_structure(input_queue.output_types,
+                                   input_queue.output_shapes)
+next_element = iterator.get_next()
+
+# create initialization ops to switch between the datasets
+init_op = iterator.make_initializer(input_queue)
+
+##start TF session
+with tf.Session() as sess:
+    # initialize the iterator on the training data
+    sess.run(init_op)
+    # get each element of the training dataset until the end is reached
+    while True:
+        try:
+            elem = sess.run(next_element)
+            print(elem)
+        except tf.errors.OutOfRangeError:
+            print("End of training dataset.")
+            break
+
+##################### Read Image #################################3
+number_class = len(label_list_a)
+batch_size = 2
+capacity = 256
+img_w = 208
+img_h = 208
+
+def input_parser(img_path, label):
+    # convert the label to one-hot encoding
+    one_hot = tf.one_hot(label, number_class)
+
+    # read the img from file
+    img_file = tf.read_file(img_path)
+    img_decoded = tf.image.decode_jpeg(img_file, channels=3)
+    img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, img_w, img_h)
+    #img_centered = tf.subtract(img_resize, IMAGENET_MEAN) #using imageNet mean to standardarize?
+    img_decoded= tf.image.per_image_standardization(img_resize)
+    return img_decoded, one_hot
+
+tr_data = input_queue.map(input_parser)
+dataset = tr_data.batch(2)
 
 
-# plt.imshow(sess.run(image_batch), interpolation='nearest')
-# plt.show()
+
+
+plt.imshow(sess.run(image_batch), interpolation='nearest')
+plt.show()
 
 
 
 
-############################
+###########################
 
 
-# image = tf.image.decode_jpeg(tf.read_file("C://Users//Kevin//Desktop//MMAI_894//Images//classroom\\classroom02.jpg"), channels=3)
-# sess = tf.InteractiveSession()
-# print(sess.run(image))
-# plt.imshow(sess.run(image), interpolation='nearest')
-# plt.show()
+image = tf.image.decode_jpeg(tf.read_file("C://Users//Kevin//Desktop//MMAI_894//Images//classroom\\classroom02.jpg"), channels=3)
+sess = tf.InteractiveSession()
+print(sess.run(image))
+plt.imshow(sess.run(image), interpolation='nearest')
+plt.show()
