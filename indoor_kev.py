@@ -51,41 +51,46 @@ def get_file(file_dir):
 
 
 ################ in the processing of fixing #########################################33
-def get_batch(image, label, image_W, image_H, batch_size, capacity):
-    #input:
-        #image : list type
-        #label : list type
-        #image_w: image_width
-        #image_H: image_height
-        #batch: batch size
-        #capacity: the max element in queue
-    #return:
-        #image_batch: 4D tensor
-        #label_batch: 1D tensor
+def get_queue(image_list_a, label_list_a):
+    input_queue  = tf.data.Dataset.from_tensor_slices((image_list_a,label_list_a)) #new function replace slice_input_producer
+    # create TensorFlow Iterator object
+    iterator = tf.data.Iterator.from_structure(input_queue.output_types,
+                                    input_queue.output_shapes)
+    next_element = iterator.get_next()
 
-    image = tf.cast(image, tf.string)
-    label = tf.cast(label, tf.int32)
+    # create initialization ops to switch between the datasets
+    init_op = iterator.make_initializer(input_queue)
 
-    #make input queue
-    input_queue = tf.train.slice_input_producer([image,label])
-    label=input_queue[1]
-    image_content = tf.read_file(input_queue[0])
-    image = tf.image.decode_jpeg(image_content, channels = 3)
-    
-    ########## Add augment if needed?? decide with team (goes here)################
+    ##start TF session
+    with tf.Session() as sess:
+        # initialize the iterator on the training data
+        sess.run(init_op)
+        # get each element of the training dataset until the end is reached
+        while True:
+            try:
+                elem = sess.run(next_element)
+                print(elem) #for testing 
+            except tf.errors.OutOfRangeError:
+                print("End of training dataset.")
+                break
+    return input_queue
 
-    image = tf.image.resize_image_with_crop_or_pad(image, image_W, image_H)
-    image = tf.image.per_image_standardization(image)
-    
-    image_batch, label_batch = tf.train.batch([image,label], batch_size = batch_size, num_threads = 64, capacity = capacity)
+def input_parser(img_path, label):
+    # convert the label to one-hot encoding
+    #one_hot = tf.one_hot(label, number_class)
+    one_hot = label
+    # read the img from file
+    img_file = tf.read_file(img_path)
+    img_decoded = tf.image.decode_jpeg(img_file, channels=3)
+    img_decoded = tf.image.convert_image_dtype(img_decoded, tf.float32)
+    img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, img_w, img_h)
+    #img_centered = tf.subtract(img_resize, IMAGENET_MEAN) #using imageNet mean to standardarize?
+    img_decoded= tf.image.per_image_standardization(img_resize)
+    return img_decoded, one_hot
 
-    label_batch = tf.reshape(label_batch,[batch_size])
-
-    return image_batch, label_batch
-
-
-batch_size = 2
-capacity = 256
+##################### Read Image #################################3
+number_class = len(label_list_a)
+batch_size = 5
 img_w = 208
 img_h = 208
 
@@ -93,42 +98,44 @@ img_h = 208
 test_dir = "C://Users//KG//Desktop//MMAI 894//Project//Images//" #kevin's desktop
 image_list, label_list = get_file(test_dir)
 
-image_batch, label_batch = get_batch(image_list,label_list, img_w,img_h, batch_size, capacity)
+#sess = tf.Session()
+input_queue = get_queue(image_list,label_list)
+tr_data = input_queue.map(input_parser)
+dataset = tr_data.batch(batch_size)
+# Prefetch data for faster consumption
+dataset = dataset.prefetch(batch_size)
+# Create an iterator over the dataset
+iterator = dataset.make_initializable_iterator()
+# Neural Net Input (images, labels)
+X, Y = iterator.get_next()
+# Initialize the iterator
+init_op = iterator.initializer
 
+#testing
 with tf.Session() as sess:
-
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord = coord)
-
-    try:
-        while not coord.should_stop():
-            img, label = sess.run([image_batch,label_batch])
-
-            for j in np.array(batch_size):
-                print("label: %d" %label[j])
-                plt.imshow(img[j,:,:,:])
-                plt.show()
-            i+=1
-    except tf.errors.OutOfRangeError:
-        print("Done")
-    finally:
-        coord.request_stop()
-    coord.join(threads)
-
-
+    # Initialize the iterator
+    sess.run(init_op)
+    #print(sess.run(Y))
+    img,label = sess.run([X,Y])
+    plt.subplot(2, 1, 1)
+    plt.imshow(img[4].astype(np.uint8))
+    plt.title(f'label {label[4]}')
+    plt.subplot(2, 1, 1)
+    plt.imshow(img[3].astype(np.uint8))
+    plt.title(f'label {label[3]}')
+    plt.show()
 
 
 # ######################################################### CODE FOR TESTING ######################
 
 # ####################################################
-image_list_a = image_list[0:5]
-label_list_a = label_list[0:5]
+image_list_a = image_list[0:20]
+label_list_a = label_list[0:20]
 
-#image = tf.cast(image_list_a, tf.string)
-#label = tf.cast(label_list_a, tf.int32)
+
 #make input queue
 # input_queue = tf.train.slice_input_producer([image,label]) #function will be removed soon
-input_queue  = tf.data.Dataset.from_tensor_slices((image_list_a,label_list_a)) #new function replace slice_input_producer
+input_queue  = tf.data.Dataset.from_tensor_slices((image_list_a,c)) #new function replace slice_input_producer
 
 # create TensorFlow Iterator object
 iterator = tf.data.Iterator.from_structure(input_queue.output_types,
@@ -146,14 +153,14 @@ with tf.Session() as sess:
     while True:
         try:
             elem = sess.run(next_element)
-            print(elem)
+            print(elem) #for testing 
         except tf.errors.OutOfRangeError:
             print("End of training dataset.")
             break
 
 ##################### Read Image #################################3
 number_class = len(label_list_a)
-batch_size = 2
+batch_size = 5
 capacity = 256
 img_w = 208
 img_h = 208
@@ -161,11 +168,12 @@ img_h = 208
 
 def input_parser(img_path, label):
     # convert the label to one-hot encoding
-    one_hot = tf.one_hot(label, number_class)
-
+    #one_hot = tf.one_hot(label, number_class)
+    one_hot = label
     # read the img from file
     img_file = tf.read_file(img_path)
     img_decoded = tf.image.decode_jpeg(img_file, channels=3)
+    img_decoded = tf.image.convert_image_dtype(img_decoded, tf.float32)
     img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, img_w, img_h)
     #img_centered = tf.subtract(img_resize, IMAGENET_MEAN) #using imageNet mean to standardarize?
     img_decoded= tf.image.per_image_standardization(img_resize)
@@ -178,17 +186,31 @@ dataset = tr_data.batch(batch_size)
 dataset = dataset.prefetch(batch_size)
 # Create an iterator over the dataset
 iterator = dataset.make_initializable_iterator()
-# Initialize the iterator
-sess.run(iterator.initializer)
-
 # Neural Net Input (images, labels)
 X, Y = iterator.get_next()
+# Initialize the iterator
+init_op = iterator.initializer
+
+#testing
+with tf.Session() as sess:
+    # Initialize the iterator
+    sess.run(init_op)
+    #print(sess.run(Y))
+    img,label = sess.run([X,Y])
+    plt.subplot(2, 1, 1)
+    plt.imshow(img[2].astype(np.uint8))
+    plt.title(f'label {label[2]}')
+    plt.show()
+
 
 
 num_steps = 1000
 display_step = 10
 learning_rate = 0.001
 dropout = 0.75
+
+
+
 
 # THIS IS A CLASSIC CNN 
 # Note that a few elements have changed (usage of sess run).
