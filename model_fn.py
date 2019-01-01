@@ -44,16 +44,16 @@ def inference(images,batch_size,unique_class):
     with tf.variable_scope('pooling2_lrn',reuse=tf.AUTO_REUSE) as scope:
         norm2 = tf.nn.lrn(conv2,depth_radius=4, bias=1.0,alpha=0.001/9.0,
                             beta=0.75,name="norm1") #cifar10 setting...need to explore
-        pool2 = tf.nn.max_pool(norm2, ksize=[1,3,3,1],strides=[1,2,2,1],
+        pool2 = tf.nn.max_pool(norm2, ksize=[1,3,3,1],strides=[1,1,1,1],
                                 padding='SAME',name='pooling2')
 
     #### 1st fully connected layer #############################
     #for simplicity lets use 128 neurons
     with tf.variable_scope('local3', reuse=tf.AUTO_REUSE) as scope:
         reshape = tf.reshape(pool2, shape = [batch_size,-1]) 
-        dim = reshape.get_shape()[0].value #readjsut this to get shape = [dim,128]
+        dim = reshape.get_shape()[1].value #readjsut this to get shape = [dim,128]
         weights = tf.get_variable('weights',
-                                    shape=[4096,128],
+                                    shape=[dim,128],
                                     dtype=tf.float32,
                                     initializer=tf.truncated_normal_initializer(stddev=0.005,dtype=tf.float32)) 
         biases = tf.get_variable('biases',
@@ -96,7 +96,20 @@ def losses(logits, labels):
         tf.summary.scalar(scope.name+'/loss',loss)
     return loss
 
+def training(loss,learning_rate):
+    with tf.name_scope('optimizer'):
+        my_global_step = tf.Variable(0, name = 'global_step', trainable=False)
+        optimizer = tf.train.AdadeltaOptimizer(learning_rate)
+        train_op = optimizer.minimize(loss, global_step = my_global_step)
+    return train_op
 
+def evaluation(logits,labels):
+    with tf.variable_scope('accuracy', reuse = tf.AUTO_REUSE) as scope:
+        correct = tf.nn.in_top_k(logits,labels,1)
+        correct = tf.cast(correct,tf.float16)
+        accuracy = tf.reduce_mean(correct)
+        tf.summary.scalar(scope.name+'/accuracy',accuracy)
+    return accuracy 
 
 test_dir = "C://Users//Kevin//Desktop//MMAI_894//Images3//" #kevin's laptop
     #test_dir = "C://Users//KG//Desktop//MMAI 894//Project//Images//" #kevin's desktop
@@ -104,16 +117,12 @@ test_dir = "C://Users//Kevin//Desktop//MMAI_894//Images3//" #kevin's laptop
 save_dir = "C://Users//kevin//Desktop//MMAI_894//Project//deep_learning//save_workspace"
 
 
-image_list, label_list = get_file(test_dir)
-image_tr,image_test = create_train_test(image_list)
-label_tr,label_test = create_train_test(label_list)
-    #len(image_tr) == len(label_tr)
-    #len(image_test) == len(label_test)
-    # print(image_tr[500])
-    # print(label_tr[500])
+image_list, label_list = pipeline_clean.get_file(test_dir)
+image_tr,image_test = pipeline_clean.create_train_test(image_list)
+label_tr,label_test = pipeline_clean.create_train_test(label_list)
 batch_size = 64
-tr_data = input_fn(image_tr,label_tr,batch_size)
-test_data = input_fn(image_test,label_test,batch_size)
+tr_data = pipeline_clean.input_fn(image_tr,label_tr,batch_size)
+test_data = pipeline_clean.input_fn(image_test,label_test,batch_size)
 
 #def train():
 
@@ -127,32 +136,28 @@ MAX_STEP = 1000
     #shape = [None, 64,64,3] <---this is what it is working with, width and height need change in pipeline
 logits = inference(images,batch_size,unique_class)
 loss = losses(logits,labels)
+op = training(loss,learning_rate)
+acc = evaluation(logits,labels)
 
-my_global_step = tf.Variable(0, name = 'global_step', trainable=False)
-optimizer = tf.train.AdadeltaOptimizer(learning_rate)
-train_op = optimizer.minimize(loss, global_step = my_global_step)
-
-saver = tf.train.Saver(tf.global_variables())
 summary_op= tf.summary.merge_all()
+sess = tf.Session()
+train_writer = tf.summary.FileWriter(save_dir,sess.graph)
+saver = tf.train.Saver()
 
 init_var=tf.global_variables_initializer()
-sess = tf.Session()
 sess.run(init)
 sess.run(init_var)
 
 coord = tf.train.Coordinator()
 threads = tf.train.start_queue_runners(sess = sess, coord = coord)
 
-summary_writer = tf.summary.FileWriter(save_dir, sess.graph)
-
-
 try:
     for step in np.arange(MAX_STEP):
         if coord.should_stop():
             break
-        _, loss_value = sess.run([train_op, loss])
+        _, loss_value = sess.run([train_op, loss,acc])
         if step % 50==0:
-            print("step: %d, loss: %4f" % (step,loss_value))
+            print("step: %d, loss: %4f" % (step,loss_value,train))
         if step % 100==0:
             summary_str = sess.run(summary_op)
             summary_writer.add_summary(summary_str, step)
