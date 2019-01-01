@@ -77,7 +77,7 @@ def get_queue(image_list_a, label_list_a):
         while True:
             try:
                 elem = sess.run(next_element)
-                print(elem) #for testing 
+                #print(elem) #for testing 
             except tf.errors.OutOfRangeError:
                 print("End of training dataset.")
                 break
@@ -91,7 +91,7 @@ def input_parser(img_path, label):
     img_file = tf.read_file(img_path)
     img_decoded = tf.image.decode_jpeg(img_file, channels=3)
     img_decoded = tf.image.convert_image_dtype(img_decoded, tf.float32)
-    img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, 208, 208) #need to reset resize
+    img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, 64, 64) #need to reset resize
     #img_centered = tf.subtract(img_resize, IMAGENET_MEAN) #using imageNet mean to standardarize?
     img_decoded= tf.image.per_image_standardization(img_resize)
     return img_decoded, labels
@@ -108,21 +108,21 @@ def input_fn(filenames, labels, batch_size):
     return inputs
 
 
-##################### Read Image #################################3
-#number_class = len(label_list_a)
-batch_size = 64
+# ##################### Read Image #################################3
+# #number_class = len(label_list_a)
+# batch_size = 64
 
-#test_dir = "C://Users//Kevin//Desktop//MMAI_894//Images//" #kevin's laptop
-test_dir = "C://Users//KG//Desktop//MMAI 894//Project//Images//" #kevin's desktop
-image_list, label_list = get_file(test_dir)
-image_tr,image_test = create_train_test(image_list)
-label_tr,label_test = create_train_test(label_list)
-#len(image_tr) == len(label_tr)
-#len(image_test) == len(label_test)
-# print(image_tr[500])
-# print(label_tr[500])
-tr_data = input_fn(image_tr,label_tr,batch_size)
-test_data = input_fn(image_test,label_test,batch_size)
+# #test_dir = "C://Users//Kevin//Desktop//MMAI_894//Images//" #kevin's laptop
+# test_dir = "C://Users//KG//Desktop//MMAI 894//Project//Images//" #kevin's desktop
+# image_list, label_list = get_file(test_dir)
+# image_tr,image_test = create_train_test(image_list)
+# label_tr,label_test = create_train_test(label_list)
+# #len(image_tr) == len(label_tr)
+# #len(image_test) == len(label_test)
+# # print(image_tr[500])
+# # print(label_tr[500])
+# tr_data = input_fn(image_tr,label_tr,batch_size)
+# test_data = input_fn(image_test,label_test,batch_size)
 
 
 
@@ -140,16 +140,16 @@ test_data = input_fn(image_test,label_test,batch_size)
 # init_op = iterator.initializer
 
 #testing
-X = tr_data["images"]
-Y = tr_data["labels"]
-init_op = tr_data["iterator_init_op"]
-with tf.Session() as sess:
-    # Initialize the iterator
-    sess.run(init_op)
-    #print(sess.run(Y))
-    img,label = sess.run([X,Y])
-    print(img[4].astype(np.uint8))
-    plt.subplot(2, 1, 1)
-    plt.imshow(img[4].astype(np.uint8))
-    plt.title(f'label {label[4]}')
-    plt.show()
+# X = tr_data["images"]
+# Y = tr_data["labels"]
+# init_op = tr_data["iterator_init_op"]
+# with tf.Session() as sess:
+#     # Initialize the iterator
+#     sess.run(init_op)
+#     #print(sess.run(Y))
+#     img,label = sess.run([X,Y])
+#     print(img[4].astype(np.uint8))
+#     plt.subplot(2, 1, 1)
+#     plt.imshow(img[4].astype(np.uint8))
+#     plt.title(f'label {label[4]}')
+#     plt.show()
