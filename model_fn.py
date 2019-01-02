@@ -1,6 +1,6 @@
 import tensorflow as tf 
 import pipeline_clean 
-
+import numpy as np
 
 def inference(images,batch_size,unique_class):
     # tf.reset_default_graph()
@@ -50,8 +50,11 @@ def inference(images,batch_size,unique_class):
     #### 1st fully connected layer #############################
     #for simplicity lets use 128 neurons
     with tf.variable_scope('local3', reuse=tf.AUTO_REUSE) as scope:
-        reshape = tf.reshape(pool2, shape = [batch_size,-1]) 
-        dim = reshape.get_shape()[1].value #readjsut this to get shape = [dim,128]
+        #reshape = tf.reshape(pool2, shape = [batch_size,-1]) 
+        #dim = reshape.get_shape()[1].value #readjsut this to get shape = [dim,128]
+        shape = pool2.get_shape().as_list()
+        dim = np.prod(shape[1:])
+        reshape = tf.reshape(pool2, [-1, dim])
         weights = tf.get_variable('weights',
                                     shape=[dim,128],
                                     dtype=tf.float32,
@@ -111,72 +114,7 @@ def evaluation(logits,labels):
         tf.summary.scalar(scope.name+'/accuracy',accuracy)
     return accuracy 
 
-test_dir = "C://Users//Kevin//Desktop//MMAI_894//Images3//" #kevin's laptop
-    #test_dir = "C://Users//KG//Desktop//MMAI 894//Project//Images//" #kevin's desktop
-
-save_dir = "C://Users//kevin//Desktop//MMAI_894//Project//deep_learning//save_workspace"
-
-
-image_list, label_list = pipeline_clean.get_file(test_dir)
-image_tr,image_test = pipeline_clean.create_train_test(image_list)
-label_tr,label_test = pipeline_clean.create_train_test(label_list)
-batch_size = 64
-tr_data = pipeline_clean.input_fn(image_tr,label_tr,batch_size)
-test_data = pipeline_clean.input_fn(image_test,label_test,batch_size)
-
-#def train():
-
-images = tr_data['images']
-labels = tr_data['labels']
-init=tr_data['iterator_init_op']
-    #Requirement for inference
-unique_class = len(set(label_list))
-learning_rate = 0.05
-MAX_STEP = 1000
-    #shape = [None, 64,64,3] <---this is what it is working with, width and height need change in pipeline
-logits = inference(images,batch_size,unique_class)
-loss = losses(logits,labels)
-op = training(loss,learning_rate)
-acc = evaluation(logits,labels)
-
-summary_op= tf.summary.merge_all()
-sess = tf.Session()
-train_writer = tf.summary.FileWriter(save_dir,sess.graph)
-saver = tf.train.Saver()
-
-init_var=tf.global_variables_initializer()
-sess.run(init)
-sess.run(init_var)
-
-coord = tf.train.Coordinator()
-threads = tf.train.start_queue_runners(sess = sess, coord = coord)
-
-try:
-    for step in np.arange(MAX_STEP):
-        if coord.should_stop():
-            break
-        _, loss_value = sess.run([train_op, loss,acc])
-        if step % 50==0:
-            print("step: %d, loss: %4f" % (step,loss_value,train))
-        if step % 100==0:
-            summary_str = sess.run(summary_op)
-            summary_writer.add_summary(summary_str, step)
-        if step % 2000==0 or (step + 1) ==MAX_STEP:
-            checkpoint_path = os.path.join(save_dir,'model.ckpt')
-            saver.save(sess, checkpoint_path, global_step=step)    
-except tf.errors.OutOfRangeError:
-    print("Done Training -- epoch limit reached")
-finally:
-    coord.request_stop()
-coord.join(threads)
-sess.close()
-
-
-
-
-
-
-
+    
 # out = images
 # # Define the number of channels of each convolution
 # # For each block, we do: 3x3 conv -> batch norm -> relu -> 2x2 maxpool
