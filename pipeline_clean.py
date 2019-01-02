@@ -12,7 +12,7 @@ def get_file(file_dir):
     labels = []
     label_recorder =[]
 
-    for root, sub_folders, files in os.walk(test_dir):
+    for root, sub_folders, files in os.walk(file_dir):
         for name in files:
             images.append(os.path.join(root,name)) #get image path
             label_name = root.split('/')[-1]  #split and find label name
@@ -91,13 +91,13 @@ def input_parser(img_path, label):
     img_file = tf.read_file(img_path)
     img_decoded = tf.image.decode_jpeg(img_file, channels=3)
     img_decoded = tf.image.convert_image_dtype(img_decoded, tf.float32)
-    img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, 64, 64) #need to reset resize
+    img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, 227, 227) #need to reset resize
     #img_centered = tf.subtract(img_resize, IMAGENET_MEAN) #using imageNet mean to standardarize?
     img_decoded= tf.image.per_image_standardization(img_resize)
     return img_decoded, labels
 
 def input_fn(filenames, labels, batch_size):
-    input_queue = get_queue(image_list,label_list)
+    input_queue = get_queue(filenames,labels)
     tr_data = input_queue.map(input_parser)
     dataset = tr_data.batch(batch_size)
     dataset = dataset.prefetch(1) # make sure you always have one batch ready to serve
