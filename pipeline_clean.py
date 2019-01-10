@@ -1,5 +1,5 @@
 import tensorflow as tf 
-
+import pandas as pd
 import numpy as np 
 import os
 import matplotlib.pyplot as plt 
@@ -41,13 +41,37 @@ def get_file(file_dir):
     #combine images + labels
     temp = np.array([images,labels_copy])
     temp = temp.transpose()
-    np.random.shuffle(temp) #randomize the images lists
+    #train and test split
+    data = []
+    trainData =[]
+    testData =[]
+    temp_pd = pd.DataFrame(temp)
+    unique_class = len(set(temp[:,1]))
+    for i in range(unique_class):
+        #print(i)
+        data = temp[temp_pd.loc[:,1] == str(i)]
+        for i in range(0,int(.8*len(data))):
+            trainData.append(data[i]) 
+        for j in range(int(.8*len(data)),len(data)):
+            testData.append(data[j])
+    trainData = np.array(trainData)
+    testData = np.array(testData)
+    # len(temp)
+    # len(trainData)
+    # len(testData)
+    np.random.shuffle(trainData) #randomize the train images lists
+    np.random.shuffle(testData) #randomize the test images lists
 
     #split into image and label list
-    image_list = list(temp[:,0])
-    label_list = list(temp[:,1])
-    label_list = list(map(int,label_list))
-    return image_list, label_list
+    #train split
+    image_tr = list(trainData[:,0])
+    label_tr = list(trainData[:,1])
+    label_tr = list(map(int,label_tr))
+    #test split
+    image_test = list(testData[:,0])
+    label_test = list(testData[:,1])
+    label_test = list(map(int,label_test))
+    return image_tr, label_tr,image_test,label_test
 
 def create_train_test(imgData):
     trainData = []
@@ -90,15 +114,27 @@ def input_parser(img_path, label):
     # read the img from file
     img_file = tf.read_file(img_path)
     img_decoded = tf.image.decode_jpeg(img_file, channels=3)
-    img_decoded = tf.image.convert_image_dtype(img_decoded, tf.float32)
+    img_decoded = tf.image.convert_image_dtype(img_decoded, tf.float32)#changed to 64
     img_resize = tf.image.resize_image_with_crop_or_pad(img_decoded, 227, 227) #need to reset resize
     #img_centered = tf.subtract(img_resize, IMAGENET_MEAN) #using imageNet mean to standardarize?
     img_decoded= tf.image.per_image_standardization(img_resize)
     return img_decoded, labels
 
+def train_preprocess(image, label):
+    image = tf.image.random_flip_left_right(image)
+
+    image = tf.image.random_brightness(image, max_delta=32.0 / 255.0)
+    image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+
+    # Make sure the image is still in [0, 1]
+    image = tf.clip_by_value(image, 0.0, 1.0)
+
+    return image, label
+
 def input_fn(filenames, labels, batch_size):
     input_queue = get_queue(filenames,labels)
     tr_data = input_queue.map(input_parser)
+    tr_data = tr_data.map(train_preprocess, num_parallel_calls=4)
     dataset = tr_data.batch(batch_size)
     dataset = dataset.prefetch(1) # make sure you always have one batch ready to serve
     iterator = dataset.make_initializable_iterator()
@@ -106,6 +142,7 @@ def input_fn(filenames, labels, batch_size):
     iterator_init_op = iterator.initializer
     inputs = {'images': images, 'labels': labels, 'iterator_init_op': iterator_init_op}
     return inputs
+
 
 
 # ##################### Read Image #################################3
