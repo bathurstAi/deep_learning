@@ -1,0 +1,9 @@
+This folder will store code for updated code for Deep Learning (MMAI894) final project
+Contrains:
+  1. Evaluate.py
+  2. model_fn.py
+  3. model_setup3.py
+  4. pipeline_clean.py
+  5. tools.py
+  6. training2.py
+  7. training3.py
